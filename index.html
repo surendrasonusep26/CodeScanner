@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Universal QR & Barcode Scanner</title>
+<style>
+  :root{--bg:#0b0b0c;--card:#0f1113;--accent:#9be7ff;--muted:#9aa0a6;color-scheme:dark}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#050507 0%,#0b0b0c 100%);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e6eef6}
+  .wrap{max-width:980px;margin:28px auto;padding:18px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;box-shadow:0 6px 30px rgba(0,0,0,.6)}
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between}
+  h1{font-size:18px;margin:0;letter-spacing:0.4px}
+  p.lead{margin:6px 0 18px;color:var(--muted);font-size:13px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,input[type=file],button{background:#0c0f12;border:1px solid rgba(255,255,255,0.04);color:inherit;padding:8px 10px;border-radius:8px;font-size:13px}
+  button.ghost{background:transparent;border:1px dashed rgba(255,255,255,0.04)}
+  .grid{display:grid;grid-template-columns:1fr 340px;gap:16px;margin-top:14px}
+  .panel{background:linear-gradient(180deg,#061016,#071019);padding:12px;border-radius:10px;min-height:320px}
+  video{width:100%;height:100%;border-radius:8px;object-fit:cover;background:#000}
+  canvas{display:none}
+  .info{font-size:13px;color:var(--muted);margin-top:8px}
+  .result{margin-top:8px;padding:10px;background:#071019;border-radius:8px;font-family:monospace;word-break:break-all}
+  label.small{font-size:12px;color:var(--muted)}
+  footer{margin-top:14px;font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+  .bad{color:#ff8a8a}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Arcane Scanner — QR & Barcode</h1>
+      <p class="lead">Camera + image upload scanning for QR, Code128, EAN, UPC, PDF417 and many more.</p>
+    </div>
+    <div class="controls">
+      <label class="small">Camera</label>
+      <select id="deviceSelect"></select>
+      <input type="file" id="imgFile" accept="image/*"/>
+      <button id="startBtn">Start</button>
+      <button id="stopBtn" class="ghost" disabled>Stop</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <video id="video" playsinline></video>
+      <canvas id="overlay"></canvas>
+      <div class="info">Point camera at a barcode or QR; allow camera access. If camera fails, upload an image.</div>
+    </div>
+
+    <div class="panel">
+      <div><strong>Last read</strong></div>
+      <div id="result" class="result">—</div>
+      <div style="margin-top:10px"><strong>Format</strong></div>
+      <div id="format" class="result">—</div>
+      <div style="margin-top:10px"><strong>History</strong></div>
+      <div id="history" class="result" style="max-height:240px;overflow:auto">—</div>
+    </div>
+  </div>
+
+  <footer>
+    <div>Works on mobile & desktop (HTTPS or localhost)</div>
+    <div id="status" class="bad"></div>
+  </footer>
+</div>
+
+<!-- ZXing library UMD (browser) -->
+<script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>
+<script>
+(async function(){
+  const { BrowserMultiFormatReader, NotFoundException } = ZXing;
+  const codeReader = new BrowserMultiFormatReader();
+  const video = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const deviceSelect = document.getElementById('deviceSelect');
+  const resultEl = document.getElementById('result');
+  const formatEl = document.getElementById('format');
+  const historyEl = document.getElementById('history');
+  const imgFile = document.getElementById('imgFile');
+  const statusEl = document.getElementById('status');
+  let selectedDeviceId = null;
+  let decoding = false;
+  let lastResults = [];
+
+  function pushHistory(text, format){
+    const time = new Date().toLocaleTimeString();
+    lastResults.unshift(`[${time}] ${format} -> ${text}`);
+    if(lastResults.length>30) lastResults.pop();
+    historyEl.textContent = lastResults.join('\\n');
+  }
+
+  async function listDevices(){
+    try{
+      const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+      deviceSelect.innerHTML = '';
+      devices.forEach((d,i)=> {
+        const opt = document.createElement('option');
+        opt.value = d.deviceId;
+        opt.textContent = d.label || 'Camera '+(i+1);
+        deviceSelect.appendChild(opt);
+      });
+      if(devices.length) { selectedDeviceId = devices[0].deviceId; deviceSelect.value = selectedDeviceId; }
+    }catch(e){
+      statusEl.textContent = 'No camera devices found';
+    }
+  }
+
+  deviceSelect.addEventListener('change', ()=> selectedDeviceId = deviceSelect.value);
+
+  async function startCamera(){
+    if(decoding) return;
+    decoding = true;
+    startBtn.disabled = true; stopBtn.disabled = false; statusEl.textContent = '';
+    overlay.width = video.clientWidth; overlay.height = video.clientHeight;
+    try{
+      await codeReader.decodeFromVideoDevice(selectedDeviceId || undefined, 'video', (result, err) => {
+        if (result) {
+          const txt = result.getText();
+          const fmt = result.getBarcodeFormat();
+          resultEl.textContent = txt;
+          formatEl.textContent = fmt;
+          pushHistory(txt, fmt);
+          // brief flash overlay
+          flashOverlay();
+        } else if (err && !(err instanceof NotFoundException)) {
+          console.error(err);
+        }
+      });
+    }catch(e){
+      console.error(e);
+      statusEl.textContent = 'Camera start failed: ' + (e.message || e);
+      decoding = false; startBtn.disabled = false; stopBtn.disabled = true;
+    }
+  }
+
+  function stopCamera(){
+    try{
+      codeReader.reset();
+    }catch(e){}
+    decoding = false; startBtn.disabled = false; stopBtn.disabled = true;
+    statusEl.textContent = '';
+  }
+
+  function flashOverlay(){
+    const ctx = overlay.getContext('2d');
+    overlay.style.display = 'block';
+    ctx.clearRect(0,0,overlay.width,overlay.height);
+    ctx.fillStyle = 'rgba(155,231,255,0.08)';
+    ctx.fillRect(0,0,overlay.width,overlay.height);
+    setTimeout(()=> ctx.clearRect(0,0,overlay.width,overlay.height),120);
+  }
+
+  imgFile.addEventListener('change', async (e)=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    await img.decode();
+    // create canvas to draw image then attempt decode using ZXing
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img,0,0);
+    try{
+      const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(c);
+      const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+      const reader = new ZXing.MultiFormatReader();
+      const res = reader.decode(binaryBitmap);
+      const txt = res.getText();
+      const fmt = res.getBarcodeFormat();
+      resultEl.textContent = txt;
+      formatEl.textContent = fmt;
+      pushHistory(txt,fmt);
+    }catch(err){
+      resultEl.textContent = 'No code found in image';
+      formatEl.textContent = '-';
+    }finally{
+      URL.revokeObjectURL(img.src);
+      imgFile.value = '';
+    }
+  });
+
+  startBtn.addEventListener('click', ()=> startCamera());
+  stopBtn.addEventListener('click', ()=> stopCamera());
+
+  // initial
+  await listDevices();
+
+  // graceful permissions check
+  try{
+    const p = await navigator.permissions?.query?.({name:'camera'});
+    if(p && p.state === 'denied') statusEl.textContent = 'Camera permission denied (browser settings)';
+  }catch(e){/*ignore*/}
+
+  // try to auto-start if only one camera and secure context
+  if(window.isSecureContext && deviceSelect.options.length===1){
+    selectedDeviceId = deviceSelect.value;
+    startCamera();
+  } else if(!window.isSecureContext){
+    statusEl.textContent = 'Run on HTTPS or localhost for camera access';
+  }
+})();
+</script>
+</body>
+</html>
