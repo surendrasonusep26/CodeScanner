@@ -3,50 +3,109 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Barcode & QR Scanner</title>
+<title>CodeScanner - Line UI</title>
 <style>
-  body { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:#111; color:#0ff; font-family:sans-serif; }
-  #reader { width: 300px; max-width: 90vw; margin-bottom: 20px; }
-  #result { font-size: 1.2em; word-break: break-all; }
-  button { padding:10px 20px; background:#0ff; border:none; color:#111; cursor:pointer; border-radius:5px; }
+  body {
+    margin:0; padding:0;
+    background:#000; color:#fff;
+    font-family:'Segoe UI', sans-serif;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:100vh;
+  }
+  h2 {
+    text-align:center;
+    font-weight:normal;
+    letter-spacing:1px;
+    text-shadow:0 0 5px #fff;
+    margin-bottom:30px;
+  }
+  #reader {
+    width:350px; max-width:90vw;
+    border:2px solid #fff;
+    border-radius:15px;
+    overflow:hidden;
+    box-shadow:0 0 15px #fff;
+    margin-bottom:20px;
+    position:relative;
+  }
+  #reader::before {
+    content:"";
+    position:absolute;
+    top:0; left:0; right:0; bottom:0;
+    border:2px dashed #fff; 
+    border-radius:15px;
+    pointer-events:none;
+  }
+  #result {
+    width:350px; max-width:90vw;
+    padding:10px 15px;
+    text-align:center;
+    font-size:1.1em;
+    border:2px solid #fff;
+    border-radius:10px;
+    box-shadow:0 0 10px #fff inset;
+    margin-bottom:20px;
+  }
+  button {
+    padding:10px 25px;
+    background:transparent;
+    color:#fff;
+    border:2px solid #fff;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:bold;
+    box-shadow:0 0 10px #fff;
+    transition:0.2s;
+  }
+  button:hover {
+    box-shadow:0 0 20px #fff;
+  }
 </style>
 <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
 
-<h2>Scan QR or Barcode</h2>
+<h2>CodeScanner</h2>
 <div id="reader"></div>
-<div id="result">Result will appear here</div>
-<button id="stopBtn">Stop Scanner</button>
+<div id="result">Scan a QR or Barcode...</div>
+<button id="toggleBtn">Start Scanner</button>
 
 <script>
-  const resultDiv = document.getElementById("result");
-  const stopBtn = document.getElementById("stopBtn");
+  const toggleBtn = document.getElementById("toggleBtn");
+  let scanning = false;
   const html5QrCode = new Html5Qrcode("reader");
 
   function startScanner() {
     Html5Qrcode.getCameras().then(cameras => {
       if(cameras && cameras.length) {
         html5QrCode.start(
-          { facingMode: "environment" }, 
+          { facingMode: "environment" },
           { fps: 10, qrbox: 250 },
-          qrCodeMessage => {
-            resultDiv.textContent = "Scanned: " + qrCodeMessage;
-          },
-          errorMessage => {
-            // optional: handle scan errors
-          }
-        );
+          qrCodeMessage => { resultDiv.textContent = "Scanned: " + qrCodeMessage; },
+          errorMessage => {}
+        ).then(() => {
+          scanning = true;
+          toggleBtn.textContent = "Stop Scanner";
+        }).catch(err => console.error(err));
       }
     }).catch(err => console.error(err));
   }
 
-  stopBtn.addEventListener("click", () => {
-    html5QrCode.stop().then(() => resultDiv.textContent="Scanner stopped").catch(err=>console.error(err));
-  });
+  function stopScanner() {
+    html5QrCode.stop().then(() => {
+      scanning = false;
+      toggleBtn.textContent = "Start Scanner";
+      resultDiv.textContent = "Scanner stopped";
+      // clear the reader div to fully release camera
+      document.getElementById("reader").innerHTML = "";
+    }).catch(err => console.error(err));
+  }
 
-  startScanner();
+  toggleBtn.addEventListener("click", () => {
+    scanning ? stopScanner() : startScanner();
+  });
 </script>
+
 
 </body>
 </html>
