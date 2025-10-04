@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barcode & QR Scanner</title>
+<style>
+  body { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:#111; color:#0ff; font-family:sans-serif; }
+  #reader { width: 300px; max-width: 90vw; margin-bottom: 20px; }
+  #result { font-size: 1.2em; word-break: break-all; }
+  button { padding:10px 20px; background:#0ff; border:none; color:#111; cursor:pointer; border-radius:5px; }
+</style>
+<script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+<h2>Scan QR or Barcode</h2>
+<div id="reader"></div>
+<div id="result">Result will appear here</div>
+<button id="stopBtn">Stop Scanner</button>
+
+<script>
+  const resultDiv = document.getElementById("result");
+  const stopBtn = document.getElementById("stopBtn");
+  const html5QrCode = new Html5Qrcode("reader");
+
+  function startScanner() {
+    Html5Qrcode.getCameras().then(cameras => {
+      if(cameras && cameras.length) {
+        html5QrCode.start(
+          { facingMode: "environment" }, 
+          { fps: 10, qrbox: 250 },
+          qrCodeMessage => {
+            resultDiv.textContent = "Scanned: " + qrCodeMessage;
+          },
+          errorMessage => {
+            // optional: handle scan errors
+          }
+        );
+      }
+    }).catch(err => console.error(err));
+  }
+
+  stopBtn.addEventListener("click", () => {
+    html5QrCode.stop().then(() => resultDiv.textContent="Scanner stopped").catch(err=>console.error(err));
+  });
+
+  startScanner();
+</script>
+
+</body>
+</html>
