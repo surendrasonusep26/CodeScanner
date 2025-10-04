@@ -3,31 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CodeScanner</title>
+<title>CodeScanner Tabs</title>
 <style>
   body {
     margin:0; padding:20px;
     background:#000; color:#fff;
     font-family:'Segoe UI', sans-serif;
     display:flex; flex-direction:column; align-items:center;
-    justify-content:flex-start;
     min-height:100vh;
   }
-  h2 {
-    text-align:center;
-    font-weight:normal;
-    letter-spacing:1px;
-    text-shadow:0 0 5px #fff;
+  h2 { text-align:center; margin-bottom:20px; }
+  .tab-buttons {
+    display:flex;
     margin-bottom:20px;
   }
-  #cameraSelect {
-    margin-bottom:20px;
-    padding:5px 10px;
+  .tab-buttons button {
+    padding:10px 20px;
     border:2px solid #fff;
-    border-radius:10px;
-    background:#000;
+    background:transparent;
     color:#fff;
     cursor:pointer;
+    font-weight:bold;
+    margin-left:-2px; /* to merge borders */
+    transition:0.2s;
+  }
+  .tab-buttons button:first-child { border-radius:10px 0 0 10px; margin-left:0; }
+  .tab-buttons button:last-child { border-radius:0 10px 10px 0; }
+  .tab-buttons button.active {
+    background:#fff;
+    color:#000;
   }
   #reader {
     width:360px; max-width:90vw;
@@ -54,55 +58,66 @@
 <body>
 
 <h2>CodeScanner</h2>
-<select id="cameraSelect"></select>
+
+<div class="tab-buttons">
+  <button id="qrTab" class="active">QR Code</button>
+  <button id="barcodeTab">Barcode</button>
+</div>
+
 <div id="reader"></div>
-<div id="result">Scanning...</div>
+<div id="result">Scanning QR Code...</div>
 
 <script>
 const readerDiv = document.getElementById("reader");
 const resultDiv = document.getElementById("result");
-const cameraSelect = document.getElementById("cameraSelect");
+const qrTab = document.getElementById("qrTab");
+const barcodeTab = document.getElementById("barcodeTab");
 
 let html5QrCode;
 let currentCameraId;
-
-// Populate camera selection and start scanner
-Html5Qrcode.getCameras().then(cameras => {
-  if(cameras && cameras.length) {
-    cameras.forEach(cam => {
-      const option = document.createElement("option");
-      option.value = cam.id;
-      option.textContent = cam.label || cam.id;
-      cameraSelect.appendChild(option);
-    });
-    currentCameraId = cameras[0].id;
-    cameraSelect.value = currentCameraId;
-    startScanner(currentCameraId);
-  } else {
-    resultDiv.textContent = "No cameras found.";
-  }
-}).catch(err => {
-  resultDiv.textContent = "Error accessing cameras: " + err;
-});
+let scanningMode = "qr"; // "qr" or "barcode"
 
 // Start scanner function
-function startScanner(cameraId) {
+function startScanner(cameraId, mode) {
   if(html5QrCode) {
     html5QrCode.stop().catch(()=>{}); // stop previous camera
   }
   html5QrCode = new Html5Qrcode("reader");
   html5QrCode.start(
     { deviceId: { exact: cameraId } },
-    { fps: 10, qrbox: 250 },
-    qrCodeMessage => { resultDiv.textContent = "Scanned: " + qrCodeMessage; },
+    { fps: 10, qrbox: 250, formatsToSupport: mode==="barcode"?[Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.EAN_13]:[Html5QrcodeSupportedFormats.QR_CODE] },
+    qrCodeMessage => { 
+      resultDiv.textContent = (mode==="barcode"?"Scanned Barcode: ":"Scanned QR: ") + qrCodeMessage; 
+    },
     errorMessage => { /* ignore minor errors */ }
   ).catch(err => resultDiv.textContent = "Camera error: " + err);
 }
 
-// Switch camera when user selects a different device
-cameraSelect.addEventListener("change", () => {
-  currentCameraId = cameraSelect.value;
-  startScanner(currentCameraId);
+// Populate cameras
+Html5Qrcode.getCameras().then(cameras => {
+  if(cameras && cameras.length) {
+    currentCameraId = cameras[0].id;
+    startScanner(currentCameraId, scanningMode);
+  } else {
+    resultDiv.textContent = "No cameras found.";
+  }
+}).catch(err => resultDiv.textContent = "Camera access error: " + err);
+
+// Tab switching
+qrTab.addEventListener("click", ()=>{
+  scanningMode="qr";
+  qrTab.classList.add("active");
+  barcodeTab.classList.remove("active");
+  resultDiv.textContent = "Scanning QR Code...";
+  startScanner(currentCameraId, scanningMode);
+});
+
+barcodeTab.addEventListener("click", ()=>{
+  scanningMode="barcode";
+  barcodeTab.classList.add("active");
+  qrTab.classList.remove("active");
+  resultDiv.textContent = "Scanning Barcode...";
+  startScanner(currentCameraId, scanningMode);
 });
 </script>
 
