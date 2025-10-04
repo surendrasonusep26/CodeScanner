@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CodeScanner Tabs</title>
+<title>CodeScanner</title>
 <style>
   body {
     margin:0; padding:20px;
@@ -14,40 +14,49 @@
   }
   h2 { text-align:center; margin-bottom:20px; }
   #cameraSelect {
-    margin-bottom:20px;
-    padding:5px 10px;
+    margin-bottom:15px;
+    padding:8px 12px;
     border:2px solid #fff;
     border-radius:10px;
     background:#000;
     color:#fff;
     cursor:pointer;
+    width:90%;
+    max-width:360px;
   }
   .tab-buttons {
     display:flex;
+    flex-wrap:wrap;
+    width:90%;
+    max-width:360px;
     margin-bottom:20px;
   }
   .tab-buttons button {
-    padding:10px 20px;
+    flex:1;
+    padding:10px;
     border:2px solid #fff;
     background:transparent;
     color:#fff;
-    cursor:pointer;
     font-weight:bold;
-    margin-left:-2px; /* merge borders */
+    cursor:pointer;
     transition:0.2s;
+    margin-left:-2px;
+    margin-top:5px;
   }
   .tab-buttons button:first-child { border-radius:10px 0 0 10px; margin-left:0; }
   .tab-buttons button:last-child { border-radius:0 10px 10px 0; }
   .tab-buttons button.active { background:#fff; color:#000; }
   #reader {
-    width:360px; max-width:90vw;
+    width:90%;
+    max-width:360px;
     border:2px solid #fff;
     border-radius:12px;
     box-shadow:0 0 10px #fff;
     overflow:hidden;
   }
   #result {
-    width:360px; max-width:90vw;
+    width:90%;
+    max-width:360px;
     margin-top:20px;
     padding:10px 15px;
     border:2px solid #fff;
@@ -83,23 +92,27 @@ const barcodeTab = document.getElementById("barcodeTab");
 
 let html5QrCode;
 let currentCameraId;
-let scanningMode = "qr"; // "qr" or "barcode"
+let scanningMode = "qr";
 
 // Start scanner
 function startScanner(cameraId, mode) {
   if(html5QrCode) {
-    html5QrCode.stop().catch(()=>{}); // stop previous
+    html5QrCode.stop().catch(()=>{}); // stop previous camera
   }
   html5QrCode = new Html5Qrcode("reader");
   html5QrCode.start(
     { deviceId: { exact: cameraId } },
-    { fps: 10, qrbox: 250, formatsToSupport: mode==="barcode"?[
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.CODE_39,
-      Html5QrcodeSupportedFormats.EAN_13
-    ]:[
-      Html5QrcodeSupportedFormats.QR_CODE
-    ] },
+    { 
+      fps: 10, 
+      qrbox: 250, 
+      formatsToSupport: mode==="barcode"?[
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.EAN_13
+      ]:[
+        Html5QrcodeSupportedFormats.QR_CODE
+      ]
+    },
     qrCodeMessage => { 
       resultDiv.textContent = (mode==="barcode"?"Scanned Barcode: ":"Scanned QR: ") + qrCodeMessage; 
     },
