@@ -72,16 +72,28 @@
 <button id="toggleBtn">Start Scanner</button>
 
 <script>
+const readerDiv = document.getElementById("reader");
 const resultDiv = document.getElementById("result");
 const toggleBtn = document.getElementById("toggleBtn");
-const readerDiv = document.getElementById("reader");
+
 let scanning = false;
 const html5QrCode = new Html5Qrcode("reader");
 
 // Show pop-up that stays until user closes
 function showPopup(message) {
+  // overlay to dim background
+  const overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.top = "0";
+  overlay.style.left = "0";
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.background = "rgba(0,0,0,0.5)";
+  overlay.style.zIndex = "999";
+  document.body.appendChild(overlay);
+
   const popup = document.createElement("div");
-  popup.style.position = "absolute";
+  popup.style.position = "fixed";
   popup.style.top = "50%";
   popup.style.left = "50%";
   popup.style.transform = "translate(-50%, -50%)";
@@ -93,6 +105,7 @@ function showPopup(message) {
   popup.style.textAlign = "center";
   popup.style.boxShadow = "0 0 15px #fff";
   popup.style.background = "transparent";
+  popup.style.zIndex = "1000";
 
   const text = document.createElement("div");
   text.textContent = message;
@@ -107,17 +120,20 @@ function showPopup(message) {
   closeBtn.style.color = "#fff";
   closeBtn.style.cursor = "pointer";
   closeBtn.style.borderRadius = "5px";
-  closeBtn.addEventListener("click", () => popup.remove());
+  closeBtn.addEventListener("click", () => {
+    popup.remove();
+    overlay.remove();
+  });
   popup.appendChild(closeBtn);
 
   document.body.appendChild(popup);
 }
 
-// Handle scan success
+// Scan success callback
 function onScanSuccess(qrCodeMessage) {
   resultDiv.textContent = "Scanned: " + qrCodeMessage;
   showPopup(qrCodeMessage);
-  stopScanner(); // stop after one scan
+  stopScanner(); // stop scanner after one scan
 }
 
 // Start scanner
