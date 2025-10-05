@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CodeScanner</title>
+<title>CodeScanner with Zoom</title>
 <style>
   body {
     margin:0; padding:20px;
@@ -53,6 +53,7 @@
     border-radius:12px;
     box-shadow:0 0 10px #fff;
     overflow:hidden;
+    position:relative;
   }
   #result {
     width:90%;
@@ -93,11 +94,31 @@ const barcodeTab = document.getElementById("barcodeTab");
 let html5QrCode;
 let currentCameraId;
 let scanningMode = "qr";
+let videoTrack;
+let zoomValue = 1;
+let zoomDirection = 1;
+
+// Apply automatic zoom in/out
+function startZoomAnimation() {
+  if(!videoTrack || !videoTrack.getCapabilities().zoom) return;
+  const capabilities = videoTrack.getCapabilities();
+  const minZoom = capabilities.zoom.min || 1;
+  const maxZoom = capabilities.zoom.max || 3;
+
+  function animateZoom() {
+    zoomValue += 0.02 * zoomDirection;
+    if(zoomValue >= maxZoom) zoomDirection = -1;
+    if(zoomValue <= minZoom) zoomDirection = 1;
+    videoTrack.applyConstraints({ advanced: [{ zoom: zoomValue }] }).catch(()=>{});
+    requestAnimationFrame(animateZoom);
+  }
+  animateZoom();
+}
 
 // Start scanner
 function startScanner(cameraId, mode) {
   if(html5QrCode) {
-    html5QrCode.stop().catch(()=>{}); // stop previous camera
+    html5QrCode.stop().catch(()=>{});
   }
   html5QrCode = new Html5Qrcode("reader");
   html5QrCode.start(
@@ -117,7 +138,14 @@ function startScanner(cameraId, mode) {
       resultDiv.textContent = (mode==="barcode"?"Scanned Barcode: ":"Scanned QR: ") + qrCodeMessage; 
     },
     errorMessage => {}
-  ).catch(err => resultDiv.textContent = "Camera error: " + err);
+  ).then(() => {
+    // Access video track for zoom
+    const videoElem = readerDiv.querySelector("video");
+    if(videoElem && videoElem.srcObject) {
+      videoTrack = videoElem.srcObject.getVideoTracks()[0];
+      startZoomAnimation();
+    }
+  }).catch(err => resultDiv.textContent = "Camera error: " + err);
 }
 
 // Populate cameras
